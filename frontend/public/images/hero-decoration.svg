@@ -1,0 +1,36 @@
+<svg width="800" height="400" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="heroGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3AAFA9;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#2B7A78;stop-opacity:0.1" />
+    </linearGradient>
+  </defs>
+  
+  {/* Основная форма */}
+  <path 
+    d="M400 50 
+       Q600 50, 700 200 
+       T400 350 
+       Q200 350, 100 200 
+       T400 50"
+    fill="url(#heroGrad)"
+    stroke="#3AAFA9"
+    stroke-width="2"
+    stroke-opacity="0.3"
+  />
+  
+  {/* Декоративные линии */}
+  <circle cx="400" cy="200" r="150" 
+    fill="none" 
+    stroke="#3AAFA9" 
+    stroke-width="1"
+    stroke-opacity="0.2"
+  />
+  
+  <circle cx="400" cy="200" r="100" 
+    fill="none" 
+    stroke="#3AAFA9" 
+    stroke-width="1"
+    stroke-opacity="0.2"
+  />
+</svg> 

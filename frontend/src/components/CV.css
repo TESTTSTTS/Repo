@@ -1,0 +1,128 @@
+.cv-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: #1a1f24;
+  color: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.cv-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid rgba(58, 175, 169, 0.2);
+}
+
+.cv-header h1 {
+  font-size: 2.5rem;
+  color: #3AAFA9;
+  margin-bottom: 0.5rem;
+}
+
+.cv-header h2 {
+  font-size: 1.5rem;
+  color: #DEF2F1;
+  margin-bottom: 1rem;
+}
+
+.contact-info {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  color: #DEF2F1;
+}
+
+.about {
+  max-width: 600px;
+  margin: 0 auto;
+  color: #DEF2F1;
+  line-height: 1.6;
+}
+
+.cv-section {
+  margin-bottom: 2rem;
+}
+
+.cv-section h3 {
+  color: #3AAFA9;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(58, 175, 169, 0.2);
+  padding-bottom: 0.5rem;
+}
+
+.experience-item, .education-item {
+  margin-bottom: 1.5rem;
+}
+
+.experience-item h4, .education-item h4 {
+  color: #DEF2F1;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.position, .degree {
+  color: #3AAFA9;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.period {
+  color: #888;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.skills-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.skill-tag {
+  background: rgba(58, 175, 169, 0.1);
+  color: #3AAFA9;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  font-size: 0.9rem;
+  border: 1px solid rgba(58, 175, 169, 0.2);
+}
+
+.languages-container {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.language-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: rgba(58, 175, 169, 0.1);
+  border-radius: 0.5rem;
+}
+
+.language {
+  color: #DEF2F1;
+}
+
+.level {
+  color: #3AAFA9;
+}
+
+@media (max-width: 640px) {
+  .cv-container {
+    padding: 1rem;
+  }
+
+  .contact-info {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .cv-header h1 {
+    font-size: 2rem;
+  }
+} 

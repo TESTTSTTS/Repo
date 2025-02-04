@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  body {
+    @apply bg-dark text-light font-sans;
+  }
+}
+
+.container {
+  @apply max-w-7xl mx-auto px-4;
+}
+
+/* Добавляем плавную прокрутку для якорных ссылок */
+html {
+  scroll-behavior: smooth;
+} 
