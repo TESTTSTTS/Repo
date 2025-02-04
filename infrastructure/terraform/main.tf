@@ -57,6 +57,9 @@ module "asg" {
   s3_bucket_name    = data.aws_s3_bucket.existing.id
   
   instance_profile_name = "${var.environment}-ec2-profile-${random_string.suffix.result}"
+  aws_access_key    = var.aws_access_key
+  aws_secret_key    = var.aws_secret_key
+  domain_name       = var.domain_name
 
   depends_on = [aws_key_pair.deployer]
 }

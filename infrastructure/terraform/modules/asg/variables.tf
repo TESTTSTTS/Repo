@@ -51,4 +51,21 @@ variable "s3_bucket_name" {
 variable "alb_security_group_id" {
   description = "ID of the ALB security group"
   type        = string
+}
+
+variable "aws_access_key" {
+  description = "AWS Access Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "aws_secret_key" {
+  description = "AWS Secret Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "domain_name" {
+  description = "Domain name for the application"
+  type        = string
 } 

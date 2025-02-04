@@ -105,8 +105,8 @@ resource "aws_launch_template" "main" {
               mkdir -p /app
               cd /app
 
-              # Клонируем репозиторий
-              git clone https://github.com/YOUR_REPO_HERE.git .
+              # Клонируем репозиторий (замените на ваш URL)
+              git clone https://github.com/TESTTSTTS/Repo.git .
 
               # Устанавливаем зависимости и собираем фронтенд
               cd frontend
@@ -114,18 +114,24 @@ resource "aws_launch_template" "main" {
               npm run build
               
               # Копируем собранный фронтенд в директорию Nginx
+              rm -rf /var/www/html/*
               cp -r build/* /var/www/html/
               
               # Настраиваем Nginx
               cat > /etc/nginx/sites-available/default <<'EOL'
               server {
                   listen 80;
-                  server_name localhost cvnq.xyz www.cvnq.xyz;
+                  server_name localhost ${var.domain_name} www.${var.domain_name};
                   
                   location / {
                       root /var/www/html;
                       try_files $uri $uri/ /index.html;
                       index index.html;
+                      
+                      # Настройки CORS
+                      add_header 'Access-Control-Allow-Origin' '*';
+                      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+                      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
                   }
 
                   location /api {
@@ -135,6 +141,18 @@ resource "aws_launch_template" "main" {
                       proxy_set_header Connection 'upgrade';
                       proxy_set_header Host $host;
                       proxy_cache_bypass $http_upgrade;
+                      
+                      # Передаем реальный IP клиента
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+                  }
+
+                  # Добавим тестовый endpoint
+                  location /health {
+                      access_log off;
+                      return 200 'healthy';
+                      add_header Content-Type text/plain;
                   }
               }
               EOL
@@ -157,7 +175,12 @@ resource "aws_launch_template" "main" {
               WorkingDirectory=/app/backend
               Environment="S3_BUCKET_NAME=${var.s3_bucket_name}"
               Environment="AWS_REGION=${data.aws_region.current.name}"
-              ExecStart=/usr/bin/python3 app.py
+              Environment="AWS_ACCESS_KEY_ID=${var.aws_access_key}"
+              Environment="AWS_SECRET_ACCESS_KEY=${var.aws_secret_key}"
+              Environment="DOMAIN_NAME=${var.domain_name}"
+              ExecStart=/usr/bin/python3 /app/backend/app.py
+              StandardOutput=append:/var/log/backend.log
+              StandardError=append:/var/log/backend.error.log
               Restart=always
 
               [Install]
