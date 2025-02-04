@@ -43,3 +43,4 @@ infrastructure/
 *.tfstate.*
 *.tfvars
 .terraform.lock.hcl
+/infrastructure0
