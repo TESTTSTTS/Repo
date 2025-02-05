@@ -9,3 +9,16 @@
 **/.terraform.lock.hcl
 **/terraform.tfstate
 **/terraform.tfstate.backup
+/tests/coverage
+/tests/reports
+/tests/__pycache__
+/tests/**/*.pyc
+
+# Docker
+.docker
+docker-compose.override.yml
+**/Dockerfile
+**/.dockerignore
+**/.docker-compose.override.yml
+/tests
+docker-compose.yml

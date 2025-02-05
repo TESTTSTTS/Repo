@@ -1,18 +1,19 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from .extensions import db
 from .services.s3 import S3Service
+from .models import User, Device, File, Message, Subscriber  # Добавляем импорт моделей
 import time
 import os
+from datetime import datetime
 
 def init_minio(app):
     """Инициализация MinIO с повторными попытками"""
     retries = 10
     for i in range(retries):
         try:
-            with app.app_context():  # Добавляем контекст приложения здесь
+            with app.app_context():
                 s3_service = S3Service()
-                # Проверяем подключение
                 s3_service.s3.head_bucket(Bucket=s3_service.bucket)
                 app.logger.info("MinIO connection successful")
                 return
@@ -24,9 +25,41 @@ def init_minio(app):
                 app.logger.error(f"Failed to connect to MinIO after {retries} attempts: {str(e)}")
                 raise
 
+def init_db(app):
+    """Инициализация базы данных"""
+    with app.app_context():
+        try:
+            # Создаем все таблицы
+            db.create_all()
+            app.logger.info("Database tables created successfully")
+            
+            # Проверяем, есть ли данные в таблицах
+            if not User.query.first():
+                app.logger.info("Initializing database with test data...")
+                # Создаем тестового пользователя
+                test_user = User(
+                    ip_address='127.0.0.1',
+                    created_at=datetime.utcnow(),
+                    first_visit=datetime.utcnow(),
+                    last_visit=datetime.utcnow()
+                )
+                db.session.add(test_user)
+                db.session.commit()
+                app.logger.info("Test data created successfully")
+        except Exception as e:
+            app.logger.error(f"Error initializing database: {str(e)}")
+            raise
+
 def create_app():
     app = Flask(__name__)
-    CORS(app)  # Включаем CORS для всех маршрутов
+    CORS(app)
+    
+    @app.route('/')
+    def index():
+        return jsonify({
+            "status": "ok",
+            "message": "Backend server is running"
+        })
     
     # Загружаем конфигурацию из переменных окружения
     app.config.update(
@@ -35,7 +68,7 @@ def create_app():
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         AWS_ACCESS_KEY_ID=os.getenv('AWS_ACCESS_KEY_ID'),
         AWS_SECRET_ACCESS_KEY=os.getenv('AWS_SECRET_ACCESS_KEY'),
-        AWS_DEFAULT_REGION=os.getenv('AWS_DEFAULT_REGION'),
+        AWS_REGION=os.getenv('AWS_REGION'),
         AWS_ENDPOINT_URL=os.getenv('AWS_ENDPOINT_URL'),
         S3_BUCKET_NAME=os.getenv('S3_BUCKET_NAME')
     )
@@ -45,7 +78,8 @@ def create_app():
         'AWS_ACCESS_KEY_ID',
         'AWS_SECRET_ACCESS_KEY',
         'AWS_ENDPOINT_URL',
-        'S3_BUCKET_NAME'
+        'S3_BUCKET_NAME',
+        'AWS_REGION'
     ]
     
     missing_vars = [var for var in required_vars if not app.config.get(var)]
@@ -55,15 +89,15 @@ def create_app():
     # Инициализируем расширения
     db.init_app(app)
 
-    # Создаем таблицы БД и инициализируем MinIO внутри контекста приложения
-    with app.app_context():
-        db.create_all()
-        app.logger.info("Database tables created successfully")
-        init_minio(app)
+    # Инициализируем базу данных и MinIO
+    init_db(app)
+    init_minio(app)
 
-        # Регистрируем маршруты
-        from .routes.api import api
-        app.register_blueprint(api, url_prefix='/api')
+    # Регистрируем маршруты
+    from .routes.api import bp as api_bp
+    from .routes.debug import bp as debug_bp
+    app.register_blueprint(api_bp)
+    app.register_blueprint(debug_bp)
 
     return app
 

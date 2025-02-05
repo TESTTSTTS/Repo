@@ -2,7 +2,9 @@ from flask import Blueprint, jsonify
 
 main = Blueprint('main', __name__)
 
-from . import api 
+from . import api, debug
+
+__all__ = ['api', 'debug']
 
 debug = Blueprint('debug', __name__, url_prefix='/api')
 

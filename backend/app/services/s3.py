@@ -70,6 +70,22 @@ class S3Service:
             current_app.logger.error(f"Error generating presigned URL: {str(e)}")
             raise
 
+    def list_files(self):
+        try:
+            response = self.s3.list_objects_v2(Bucket=self.bucket)
+            files = []
+            if 'Contents' in response:
+                for obj in response['Contents']:
+                    files.append({
+                        'key': obj['Key'],
+                        'size': obj['Size'],
+                        'last_modified': obj['LastModified'].isoformat()
+                    })
+            return files
+        except Exception as e:
+            current_app.logger.error(f"Error listing files: {str(e)}")
+            raise
+
 def get_s3_client():
     return boto3.client(
         's3',
