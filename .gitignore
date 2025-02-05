@@ -1,3 +1,11 @@
 /infrastructure
 /logs
 /.vscode
+.env
+*.env
+!.env.example
+**/terraform.tfvars
+**/.terraform
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
