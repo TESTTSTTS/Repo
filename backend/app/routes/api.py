@@ -1,11 +1,12 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, send_file
 from ..models import db, User, Device, File, Message, Subscriber
-from ..services.s3 import S3Service
+from ..services.files import FileService
 from datetime import datetime
 import json
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import uuid
+import os
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -13,6 +14,13 @@ limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"]
 )
+
+file_service = None
+
+@bp.before_app_first_request
+def init_file_service():
+    global file_service
+    file_service = FileService(current_app)
 
 @bp.route('/')
 def index():
@@ -155,73 +163,165 @@ def record_visit():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@bp.route('/upload', methods=['POST'])
+@bp.route('/files', methods=['POST'])
 def upload_file():
+    """Загрузка файла"""
     if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
+        return jsonify({'error': 'No file part'}), 400
     
     file = request.files['file']
-    if not file.filename:
-        return jsonify({'error': 'No file selected'}), 400
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    # Получаем или создаем пользователя по IP
+    ip_address = request.remote_addr
+    user = User.query.filter_by(ip_address=ip_address).first()
+    if not user:
+        user = User(
+            ip_address=ip_address,
+            created_at=datetime.utcnow(),
+            first_visit=datetime.utcnow(),
+            last_visit=datetime.utcnow()
+        )
+        db.session.add(user)
+        db.session.commit()
+
+    # Получаем или создаем устройство
+    user_agent = request.headers.get('User-Agent')
+    device = Device.query.filter_by(user_id=user.id, user_agent=user_agent).first()
+    if not device:
+        device = Device(
+            user_id=user.id,
+            user_agent=user_agent,
+            device_info=request.headers.get('Sec-Ch-Ua', '')
+        )
+        db.session.add(device)
+        db.session.commit()
 
     try:
-        s3_service = S3Service()
-        s3_key = s3_service.upload_file(file, file.content_type)
-        
-        db_file = File(
-            file_id=str(uuid.uuid4()),
-            filename=file.filename,
-            s3_key=s3_key,
-            content_type=file.content_type,
-            size=file.content_length or 0
-        )
-        db.session.add(db_file)
-        db.session.commit()
-        
-        return jsonify({
-            'status': 'ok',
-            'fileId': db_file.file_id,
-            'filename': db_file.filename,
-            'url': s3_service.get_presigned_url(s3_key)
-        })
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        # Сохраняем файл
+        saved_file = file_service.save_file(file, user.id, device.id)
+        return jsonify(saved_file.to_dict()), 201
     except Exception as e:
         current_app.logger.error(f"Error uploading file: {str(e)}")
-        db.session.rollback()
         return jsonify({'error': 'Failed to upload file'}), 500
 
-@bp.route('/files')
-def list_files():
+@bp.route('/files/<int:file_id>', methods=['GET'])
+def get_file_info(file_id):
+    """Получение информации о файле"""
     try:
-        s3_service = S3Service()
-        files = s3_service.list_files()
+        file = file_service.get_file(file_id)
+        return jsonify(file.to_dict())
+    except Exception as e:
+        current_app.logger.error(f"Error getting file info: {str(e)}")
+        return jsonify({'error': 'File not found'}), 404
+
+@bp.route('/files/<int:file_id>/download', methods=['GET'])
+def download_file(file_id):
+    """Скачивание файла"""
+    try:
+        file = file_service.get_file(file_id)
+        file_path = file_service.get_file_path(file)
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found on disk'}), 404
+        
+        # Увеличиваем счетчик скачиваний
+        file_service.increment_download_count(file)
+        
+        return send_file(
+            file_path,
+            mimetype=file.mime_type,
+            as_attachment=True,
+            download_name=file.original_name
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error downloading file: {str(e)}")
+        return jsonify({'error': 'Failed to download file'}), 500
+
+@bp.route('/files/<int:file_id>', methods=['DELETE'])
+def delete_file(file_id):
+    """Удаление файла"""
+    try:
+        file_service.delete_file(file_id)
+        return '', 204
+    except Exception as e:
+        current_app.logger.error(f"Error deleting file: {str(e)}")
+        return jsonify({'error': 'Failed to delete file'}), 500
+
+@bp.route('/files', methods=['GET'])
+def list_files():
+    """Получение списка файлов с фильтрацией и пагинацией"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        user_id = request.args.get('user_id', type=int)
+        device_id = request.args.get('device_id', type=int)
+        mime_type = request.args.get('mime_type')
+        
+        query = File.query
+        
+        # Применяем фильтры
+        if user_id:
+            query = query.filter_by(user_id=user_id)
+        if device_id:
+            query = query.filter_by(device_id=device_id)
+        if mime_type:
+            query = query.filter_by(mime_type=mime_type)
+        
+        # Сортировка по дате создания (новые первые)
+        query = query.order_by(File.created_at.desc())
+        
+        # Пагинация
+        pagination = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
         return jsonify({
-            'status': 'ok',
-            'files': files
+            'items': [file.to_dict() for file in pagination.items],
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'current_page': pagination.page,
+            'per_page': per_page
         })
     except Exception as e:
         current_app.logger.error(f"Error listing files: {str(e)}")
         return jsonify({'error': 'Failed to list files'}), 500
 
-@bp.route('/files/<file_id>')
-def get_file(file_id):
-    file = File.query.filter_by(file_id=file_id).first()
-    if not file:
-        return jsonify({'error': 'File not found'}), 404
-        
+@bp.route('/files/search', methods=['GET'])
+def search_files():
+    """Поиск файлов по имени или типу"""
     try:
-        s3_service = S3Service()
-        url = s3_service.get_presigned_url(file.s3_key)
+        query = request.args.get('q', '')
+        mime_type = request.args.get('type', '')
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        file_query = File.query
+        
+        if query:
+            file_query = file_query.filter(File.original_name.ilike(f'%{query}%'))
+        if mime_type:
+            file_query = file_query.filter(File.mime_type.ilike(f'%{mime_type}%'))
+            
+        pagination = file_query.order_by(File.created_at.desc()).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
         return jsonify({
-            'status': 'ok',
-            'fileId': file.file_id,
-            'filename': file.filename,
-            'url': url
+            'items': [file.to_dict() for file in pagination.items],
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'current_page': pagination.page,
+            'per_page': per_page
         })
     except Exception as e:
-        current_app.logger.error(f"Error getting file: {str(e)}")
-        return jsonify({'error': 'Failed to get file'}), 500
+        current_app.logger.error(f"Error searching files: {str(e)}")
+        return jsonify({'error': 'Failed to search files'}), 500
 
 @bp.route('/debug/data', methods=['GET'])
 def get_debug_data():

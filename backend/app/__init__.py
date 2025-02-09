@@ -1,35 +1,19 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from .extensions import db
-from .services.s3 import S3Service
-from .models import User, Device, File, Message, Subscriber  # Добавляем импорт моделей
-import time
+from .models import User, Device, File, Message, Subscriber
 import os
 from datetime import datetime
-
-def init_minio(app):
-    """Инициализация MinIO с повторными попытками"""
-    retries = 10
-    for i in range(retries):
-        try:
-            with app.app_context():
-                s3_service = S3Service()
-                s3_service.s3.head_bucket(Bucket=s3_service.bucket)
-                app.logger.info("MinIO connection successful")
-                return
-        except Exception as e:
-            if i < retries - 1:
-                app.logger.warning(f"MinIO connection attempt {i+1} failed, retrying in 3s...")
-                time.sleep(3)
-            else:
-                app.logger.error(f"Failed to connect to MinIO after {retries} attempts: {str(e)}")
-                raise
 
 def init_db(app):
     """Инициализация базы данных"""
     with app.app_context():
         try:
-            # Создаем все таблицы
+            # Удаляем все таблицы
+            db.drop_all()
+            app.logger.info("Database tables dropped successfully")
+            
+            # Создаем все таблицы заново
             db.create_all()
             app.logger.info("Database tables created successfully")
             
@@ -64,34 +48,20 @@ def create_app():
     # Загружаем конфигурацию из переменных окружения
     app.config.update(
         SECRET_KEY=os.getenv('SECRET_KEY', 'dev'),
-        SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL'),
+        SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL', 'sqlite:///app.db'),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        AWS_ACCESS_KEY_ID=os.getenv('AWS_ACCESS_KEY_ID'),
-        AWS_SECRET_ACCESS_KEY=os.getenv('AWS_SECRET_ACCESS_KEY'),
-        AWS_REGION=os.getenv('AWS_REGION'),
-        AWS_ENDPOINT_URL=os.getenv('AWS_ENDPOINT_URL'),
-        S3_BUCKET_NAME=os.getenv('S3_BUCKET_NAME')
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # Максимальный размер файла 16MB
+        UPLOAD_FOLDER=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'storage', 'uploads')
     )
 
-    # Проверяем обязательные переменные окружения
-    required_vars = [
-        'AWS_ACCESS_KEY_ID',
-        'AWS_SECRET_ACCESS_KEY',
-        'AWS_ENDPOINT_URL',
-        'S3_BUCKET_NAME',
-        'AWS_REGION'
-    ]
-    
-    missing_vars = [var for var in required_vars if not app.config.get(var)]
-    if missing_vars:
-        raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+    # Создаем директорию для загрузки файлов, если она не существует
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     # Инициализируем расширения
     db.init_app(app)
 
-    # Инициализируем базу данных и MinIO
+    # Инициализируем базу данных
     init_db(app)
-    init_minio(app)
 
     # Регистрируем маршруты
     from .routes.api import bp as api_bp
