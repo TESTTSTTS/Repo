@@ -21,4 +21,5 @@ docker-compose.override.yml
 **/.dockerignore
 **/.docker-compose.override.yml
 /tests
+/startsc
 docker-compose.yml
